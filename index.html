@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>My Diary</title>
+  <script type="module">
+    // Firebase SDK 読み込み
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, orderBy } 
+      from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    // import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
+    // https://firebase.google.com/docs/web/setup#available-libraries
+
+    // ここに自分の firebaseConfig を貼り付け
+    const firebaseConfig = {
+      apiKey: "AIzaSyDJbyJTYOiVhUMLD2jJSUY7pXdpuAFsnm0",
+      authDomain: "my-diary-app-wow.firebaseapp.com",
+      projectId: "my-diary-app-wow",
+      storageBucket: "my-diary-app-wow.firebasestorage.app",
+      messagingSenderId: "75626019057",
+      appId: "1:75626019057:web:2cbd06d1ca5616f4845150"
+    };
+
+
+    // 初期化
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // 日記保存
+    async function saveDiary() {
+      const text = document.getElementById("diaryText").value;
+      if (!text) return;
+      await addDoc(collection(db, "diary"), {
+        text: text,
+        createdAt: serverTimestamp()
+      });
+      document.getElementById("diaryText").value = "";
+      loadDiary();
+    }
+
+	// 日記一覧取得
+	async function loadDiary() {
+	  const diaryList = document.getElementById("diaryList");
+	  diaryList.innerHTML = "";
+	  
+	  const q = query(collection(db, "diary"), orderBy("createdAt", "asc"));
+	  const querySnapshot = await getDocs(q);
+	  //const querySnapshot = await getDocs(collection(db, "diary"));
+	  
+		querySnapshot.forEach((doc) => {
+    		const data = doc.data();
+	    	const createdAt = data.createdAt ? data.createdAt.toDate() : null;
+    		const dateStr = createdAt
+      			? createdAt.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })
+		    	: "日時不明";
+		    const li = document.createElement("li");
+		    li.textContent = `${dateStr}：${data.text}`;
+	    	diaryList.appendChild(li);
+	    });
+	}
+    
+
+    window.saveDiary = saveDiary;
+    window.onload = loadDiary;
+  </script>
+</head>
+<body>
+  <h1>📓 My Diary</h1>
+  <textarea id="diaryText" rows="4" cols="40" placeholder="今日の出来事..."></textarea><br>
+  <button onclick="saveDiary()">保存</button>
+  <h2>日記一覧</h2>
+  <ul id="diaryList"></ul>
+</body>
+</html>
