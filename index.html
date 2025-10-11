@@ -57,7 +57,7 @@
       			? createdAt.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })
 		    	: "日時不明";
 		    const li = document.createElement("li");
-		    li.textContent = `${dateStr}：${data.text}`;
+		    li.textContent = `${dateStr}：\n${data.text}`;
 	    	diaryList.appendChild(li);
 	    });
 	}
@@ -77,4 +77,5 @@
 	</div>
 </body>
 </html>
+
 
