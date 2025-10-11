@@ -1,73 +1,94 @@
-/* === ベース設定 === */
+/* === 全体レイアウト === */
 body {
   font-family: "Hiragino Sans", "Noto Sans JP", sans-serif;
-  background-color: #f9f9f9;
+  background-color: #f0f2f5;
   color: #333;
   font-size: 18px;
   line-height: 1.6;
-  margin: 20px;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;   /* 中央寄せ */
+  align-items: flex-start;
+  min-height: 100vh;
 }
 
-/* 見出し */
+/* === コンテナ（全体を中央にまとめる） === */
+.container {
+  background: #fff;
+  width: 95%;
+  max-width: 600px;
+  margin-top: 30px;
+  padding: 20px;
+  border-radius: 16px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* === 見出し === */
 h1 {
-  font-size: 24px;
   text-align: center;
-  margin-bottom: 20px;
   color: #444;
+  margin-bottom: 20px;
 }
 
-/* 入力エリア */
+/* === 入力エリア === */
 textarea {
   width: 100%;
   font-size: 18px;
-  padding: 10px;
+  padding: 12px;
   margin-bottom: 10px;
-  border-radius: 6px;
   border: 1px solid #ccc;
+  border-radius: 8px;
   box-sizing: border-box;
 }
 
-/* ボタン */
+/* === ボタン === */
 button {
+  width: 100%;
   background-color: #4CAF50;
   color: white;
   border: none;
-  padding: 10px 18px;
+  padding: 12px;
   font-size: 18px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
+  margin-bottom: 20px;
 }
 
 button:hover {
-  background-color: #45a049;
+  background-color: #43a047;
 }
 
-/* 日記一覧 */
+/* === 日記リスト === */
 ul {
   list-style: none;
   padding: 0;
+  margin: 0;
 }
 
 li {
-  background: white;
+  background: #fafafa;
   border: 1px solid #ddd;
-  border-radius: 8px;
-  margin-bottom: 10px;
-  padding: 10px;
-  font-size: 18px;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+  transition: transform 0.1s;
 }
 
-/* === スマホ画面（幅600px以下）の場合 === */
+li:hover {
+  transform: scale(1.01);
+}
+
+/* === スマホ対応 === */
 @media (max-width: 600px) {
   body {
     font-size: 20px;
-    margin: 15px;
   }
-
-  h1 {
-    font-size: 22px;
+  .container {
+    margin-top: 15px;
+    padding: 16px;
   }
-
   textarea, button, li {
     font-size: 20px;
   }
