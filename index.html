@@ -5,17 +5,71 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My Diary</title>
   <link rel="stylesheet" href="style.css">
-  
+</head>
+<body>
+  <div class="container">
+    <h1>📓 My Diary</h1>
+    <form id="diaryForm" onsubmit="return false;">
+  <label id="diaryLabel" for="diaryText">日記を入力</label>
+      <textarea id="diaryText" rows="4" cols="40" placeholder="今日の出来事..."></textarea>
+      <div class="color-select" style="margin:8px 0;">
+        <span>背景色：</span>
+        <label style="background:#f8f9fa; padding:2px 8px; border-radius:4px; margin-right:8px;">
+          <input type="radio" name="bgColor" value="#f8f9fa" checked> 1
+        </label>
+        <label style="background:#e3f2fd; padding:2px 8px; border-radius:4px; margin-right:8px;">
+          <input type="radio" name="bgColor" value="#e3f2fd"> 2
+        </label>
+        <label style="background:#fff3e0; padding:2px 8px; border-radius:4px;">
+          <input type="radio" name="bgColor" value="#fff3e0"> 3
+        </label>
+      </div>
+      <div class="form-actions">
+        <button id="saveBtn" type="button">保存</button>
+        <button id="cancelBtn" type="button" style="display:none; margin-left:8px; background:#eee; color:#333;">キャンセル</button>
+        <span id="status" role="status" aria-live="polite"></span>
+      </div>
+    </form>
+    <h2>日記一覧</h2>
+    <ul id="diaryList"></ul>
+  </div>
+
   <script type="module">
+    // 編集状態管理用
+    let editingId = null;
+
+    // 編集開始
+    window.startEditDiary = function(id, data) {
+      editingId = id;
+      document.getElementById("diaryText").value = data.text;
+      // 色をセット
+      if (data.color) {
+        const radios = document.querySelectorAll('input[name="bgColor"]');
+        radios.forEach(r => { r.checked = (r.value === data.color); });
+      }
+      // ボタン・UI切替
+      document.getElementById("saveBtn").textContent = "更新";
+      document.getElementById("cancelBtn").style.display = "inline-block";
+      document.getElementById("diaryLabel").textContent = "日記を入力：編集中";
+      document.getElementById("status").textContent = "";
+    };
+
+    // キャンセル
+    document.getElementById("cancelBtn").onclick = function() {
+      editingId = null;
+      document.getElementById("diaryText").value = "";
+      document.querySelector('input[name="bgColor"]').checked = true;
+      document.getElementById("saveBtn").textContent = "保存";
+      document.getElementById("cancelBtn").style.display = "none";
+      document.getElementById("diaryLabel").textContent = "日記を入力";
+      document.getElementById("status").textContent = "";
+    };
     // Firebase SDK 読み込み
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, orderBy } 
+    import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, orderBy }
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    // import { initializeApp } from "https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js";
-    // https://firebase.google.com/docs/web/setup#available-libraries
-
-    // ここに自分の firebaseConfig を貼り付け
+    // firebaseConfig（既存のまま）
     const firebaseConfig = {
       apiKey: "AIzaSyDJbyJTYOiVhUMLD2jJSUY7pXdpuAFsnm0",
       authDomain: "my-diary-app-wow.firebaseapp.com",
@@ -25,69 +79,119 @@
       appId: "1:75626019057:web:2cbd06d1ca5616f4845150"
     };
 
-
     // 初期化
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
     // 日記保存
+    import { doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
     async function saveDiary() {
-      const text = document.getElementById("diaryText").value;
-      if (!text) return;
-      await addDoc(collection(db, "diary"), {
-        text: text,
-        createdAt: serverTimestamp()
-      });
-      document.getElementById("diaryText").value = "";
-      loadDiary();
+      const saveBtn = document.getElementById("saveBtn");
+      const status = document.getElementById("status");
+      const text = document.getElementById("diaryText").value.trim();
+      const color = document.querySelector('input[name="bgColor"]:checked').value;
+
+      if (!text) {
+        status.textContent = "テキストを入力してください";
+        return;
+      }
+
+      try {
+        saveBtn.disabled = true;
+        status.textContent = "保存中...";
+
+        if (editingId) {
+          // 編集: updateDoc
+          const ref = doc(db, "diary", editingId);
+          await updateDoc(ref, {
+            text: text,
+            color: color
+          });
+        } else {
+          // 新規: addDoc
+          await addDoc(collection(db, "diary"), {
+            text: text,
+            color: color,
+            createdAt: serverTimestamp()
+          });
+        }
+
+        // フォームリセット
+  editingId = null;
+  document.getElementById("diaryText").value = "";
+  document.querySelector('input[name="bgColor"]').checked = true;
+  document.getElementById("saveBtn").textContent = "保存";
+  document.getElementById("cancelBtn").style.display = "none";
+  document.getElementById("diaryLabel").textContent = "日記を入力";
+  status.textContent = "";
+  await loadDiary();
+      } catch (error) {
+        status.textContent = "保存に失敗しました。もう一度お試しください。";
+        console.error("保存エラー:", error);
+      } finally {
+        saveBtn.disabled = false;
+      }
     }
 
-	// 日記一覧取得
-	async function loadDiary() {
-	  const diaryList = document.getElementById("diaryList");
-	  diaryList.innerHTML = "";
-	  
-	  const q = query(collection(db, "diary"), orderBy("createdAt", "desc"));
-	  const querySnapshot = await getDocs(q);
-	  
-		querySnapshot.forEach((doc) => {
-    		const data = doc.data();
-	    	const createdAt = data.createdAt ? data.createdAt.toDate() : null;
-    		const dateStr = createdAt
-      			? createdAt.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })
-		    	: "日時不明";
-		    const li = document.createElement("li");
-			const dateEl = document.createElement("div");
-			const textEl = document.createElement("div");
+    // 日記一覧取得
+    async function loadDiary() {
+      const diaryList = document.getElementById("diaryList");
+      diaryList.innerHTML = "";
 
-			dateEl.textContent = dateStr;
-			textEl.textContent = data.text;
+      const q = query(collection(db, "diary"), orderBy("createdAt", "desc"));
+      const querySnapshot = await getDocs(q);
 
-			dateEl.classList.add("date");
-			textEl.classList.add("text");
+      querySnapshot.forEach((doc) => {
+        const data = doc.data();
+        const createdAt = data.createdAt ? data.createdAt.toDate() : null;
+        const dateStr = createdAt
+          ? createdAt.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })
+          : "日時不明";
 
-			li.appendChild(dateEl);
-			li.appendChild(textEl);
-			diaryList.appendChild(li);
-	    });
-	}
-    
+        const li = document.createElement("li");
+        li.dataset.id = doc.id;
+        const dateEl = document.createElement("div");
+        const textEl = document.createElement("div");
 
-    window.saveDiary = saveDiary;
-    window.onload = loadDiary;
+        dateEl.textContent = dateStr;
+        textEl.textContent = data.text;
+
+        dateEl.classList.add("date");
+        textEl.classList.add("text");
+
+        // 背景色を反映（デフォルトは#f8f9fa）
+        li.style.background = data.color || "#f8f9fa";
+        li.style.margin = "12px 0";
+        li.style.borderRadius = "8px";
+        li.style.padding = "8px 12px";
+        li.style.listStyle = "none";
+
+  // 編集ボタン（日時の下に小さく表示）
+  const editBtn = document.createElement("button");
+  editBtn.textContent = "編集";
+  editBtn.type = "button";
+  editBtn.className = "edit-btn";
+  editBtn.onclick = () => startEditDiary(doc.id, data);
+
+  // 日時と編集ボタンを右詰め横並び
+  const dateWrap = document.createElement("div");
+  dateWrap.className = "date-edit-wrap";
+  dateWrap.appendChild(dateEl);
+  dateWrap.appendChild(editBtn);
+  li.appendChild(dateWrap);
+  li.appendChild(textEl);
+  diaryList.appendChild(li);
+      });
+    }
+
+    // 初期化: ボタンイベント登録と一覧読み込み
+    window.addEventListener('DOMContentLoaded', () => {
+      const btn = document.getElementById("saveBtn");
+      if (btn) btn.addEventListener("click", saveDiary);
+      loadDiary();
+    });
   </script>
-</head>
-<body>
-	<div class="container">
-  		<h1>📓 My Diary</h1>
-  		<textarea id="diaryText" rows="4" cols="40" placeholder="今日の出来事..."></textarea><br>
-  		<button onclick="saveDiary()">保存</button>
-  		<h2>日記一覧</h2>
-  		<ul id="diaryList"></ul>
-	</div>
 </body>
 </html>
-
-
-
 
