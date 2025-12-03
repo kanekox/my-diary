@@ -1,16 +1,20 @@
 <!DOCTYPE html>
 <html lang="ja">
+
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>My Diary</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet"
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
 </head>
+
 <body>
   <div class="container">
     <h1>📓 My Diary</h1>
     <form id="diaryForm" onsubmit="return false;">
-  <label id="diaryLabel" for="diaryText">日記を入力</label>
+      <label id="diaryLabel" for="diaryText">日記を入力</label>
       <textarea id="diaryText" rows="4" cols="40" placeholder="今日の出来事..."></textarea>
       <div class="color-select" style="margin:8px 0;">
         <span>背景色：</span>
@@ -26,7 +30,8 @@
       </div>
       <div class="form-actions">
         <button id="saveBtn" type="button">保存</button>
-        <button id="cancelBtn" type="button" style="display:none; margin-left:8px; background:#eee; color:#333;">キャンセル</button>
+        <button id="cancelBtn" type="button"
+          style="display:none; margin-left:8px; background:#eee; color:#333;">キャンセル</button>
         <span id="status" role="status" aria-live="polite"></span>
       </div>
     </form>
@@ -39,7 +44,7 @@
     let editingId = null;
 
     // 編集開始
-    window.startEditDiary = function(id, data) {
+    window.startEditDiary = function (id, data) {
       editingId = id;
       document.getElementById("diaryText").value = data.text;
       // 色をセット
@@ -55,7 +60,7 @@
     };
 
     // キャンセル
-    document.getElementById("cancelBtn").onclick = function() {
+    document.getElementById("cancelBtn").onclick = function () {
       editingId = null;
       document.getElementById("diaryText").value = "";
       document.querySelector('input[name="bgColor"]').checked = true;
@@ -85,7 +90,24 @@
     const db = getFirestore(app);
 
     // 日記保存
-    import { doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    // 日記削除
+    window.deleteDiary = async function (id) {
+      if (!confirm("削除してもよろしいですか？")) return;
+
+      try {
+        await deleteDoc(doc(db, "diary", id));
+        // もし編集中の日記を削除した場合はリセット
+        if (editingId === id) {
+          document.getElementById("cancelBtn").click();
+        }
+        await loadDiary();
+      } catch (error) {
+        console.error("削除エラー:", error);
+        alert("削除に失敗しました。");
+      }
+    };
 
     async function saveDiary() {
       const saveBtn = document.getElementById("saveBtn");
@@ -119,14 +141,14 @@
         }
 
         // フォームリセット
-  editingId = null;
-  document.getElementById("diaryText").value = "";
-  document.querySelector('input[name="bgColor"]').checked = true;
-  document.getElementById("saveBtn").textContent = "保存";
-  document.getElementById("cancelBtn").style.display = "none";
-  document.getElementById("diaryLabel").textContent = "日記を入力";
-  status.textContent = "";
-  await loadDiary();
+        editingId = null;
+        document.getElementById("diaryText").value = "";
+        document.querySelector('input[name="bgColor"]').checked = true;
+        document.getElementById("saveBtn").textContent = "保存";
+        document.getElementById("cancelBtn").style.display = "none";
+        document.getElementById("diaryLabel").textContent = "日記を入力";
+        status.textContent = "";
+        await loadDiary();
       } catch (error) {
         status.textContent = "保存に失敗しました。もう一度お試しください。";
         console.error("保存エラー:", error);
@@ -168,21 +190,31 @@
         li.style.padding = "8px 12px";
         li.style.listStyle = "none";
 
-  // 編集ボタン（日時の下に小さく表示）
-  const editBtn = document.createElement("button");
-  editBtn.textContent = "編集";
-  editBtn.type = "button";
-  editBtn.className = "edit-btn";
-  editBtn.onclick = () => startEditDiary(doc.id, data);
+        // 編集ボタン（日時の下に小さく表示）
+        const editBtn = document.createElement("button");
+        editBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">edit</span>';
+        editBtn.title = "編集";
+        editBtn.type = "button";
+        editBtn.className = "edit-btn";
+        editBtn.onclick = () => startEditDiary(doc.id, data);
 
-  // 日時と編集ボタンを右詰め横並び
-  const dateWrap = document.createElement("div");
-  dateWrap.className = "date-edit-wrap";
-  dateWrap.appendChild(dateEl);
-  dateWrap.appendChild(editBtn);
-  li.appendChild(dateWrap);
-  li.appendChild(textEl);
-  diaryList.appendChild(li);
+        // 削除ボタン
+        const deleteBtn = document.createElement("button");
+        deleteBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">delete</span>';
+        deleteBtn.title = "削除";
+        deleteBtn.type = "button";
+        deleteBtn.className = "delete-btn";
+        deleteBtn.onclick = () => deleteDiary(doc.id);
+
+        // 日時と編集ボタンを右詰め横並び
+        const dateWrap = document.createElement("div");
+        dateWrap.className = "date-edit-wrap";
+        dateWrap.appendChild(dateEl);
+        dateWrap.appendChild(editBtn);
+        dateWrap.appendChild(deleteBtn);
+        li.appendChild(dateWrap);
+        li.appendChild(textEl);
+        diaryList.appendChild(li);
       });
     }
 
@@ -194,5 +226,5 @@
     });
   </script>
 </body>
-</html>
 
+</html>

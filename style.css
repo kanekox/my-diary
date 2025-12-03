@@ -4,6 +4,7 @@
   gap: 8px;
   align-items: center;
 }
+
 /* 日時と編集ボタンを右詰め横並び */
 .date-edit-wrap {
   display: flex;
@@ -11,10 +12,11 @@
   gap: 8px;
   justify-content: flex-end;
 }
+
 /* 編集ボタン小型化 */
 .edit-btn {
   font-size: 12px;
-  padding: 2px 4px;
+  padding: 4px;
   border-radius: 6px;
   background: #e0e0e0;
   color: #333;
@@ -23,28 +25,61 @@
   cursor: pointer;
   box-shadow: none;
   transition: background 0.2s;
-  min-width: unset;
-  width: auto;
+  width: 3em;
+  /* 全角3文字分 */
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
+
 .edit-btn:hover {
   background: #bdbdbd;
 }
+
+/* 削除ボタン */
+.delete-btn {
+  font-size: 12px;
+  padding: 4px;
+  border-radius: 6px;
+  background: #ffcdd2;
+  color: #b71c1c;
+  border: none;
+  margin: 0 0 0 8px;
+  cursor: pointer;
+  box-shadow: none;
+  transition: background 0.2s;
+  width: 3em;
+  /* 全角3文字分 */
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.delete-btn:hover {
+  background: #ef9a9a;
+}
+
 /* === 日記リストの背景色・文字色調整 === */
 li {
   color: #222;
   border: 1px solid #e0e0e0;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04);
 }
 
 li[style*="#f8f9fa"] {
   background: #f8f9fa !important;
 }
+
 li[style*="#e3f2fd"] {
   background: #e3f2fd !important;
 }
+
 li[style*="#fff3e0"] {
   background: #fff3e0 !important;
 }
+
 /* === 全体レイアウト === */
 body {
   font-family: "Hiragino Sans", "Noto Sans JP", sans-serif;
@@ -55,7 +90,8 @@ body {
   margin: 0;
   padding: 0;
   display: flex;
-  justify-content: center;   /* 中央寄せ */
+  justify-content: center;
+  /* 中央寄せ */
   align-items: flex-start;
   min-height: 100vh;
 }
@@ -68,7 +104,7 @@ body {
   margin-top: 30px;
   padding: 20px;
   border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 /* === 見出し === */
@@ -76,6 +112,7 @@ h1 {
   text-align: center;
   color: #444;
   margin-bottom: 20px;
+  font-size: 24px;
 }
 
 /* === 入力エリア === */
@@ -116,7 +153,7 @@ ul {
 li {
   background: #fff;
   border-radius: 10px;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   padding: 12px 16px;
   margin-bottom: 12px;
   max-width: 600px;
@@ -146,14 +183,15 @@ li:hover {
   body {
     font-size: 20px;
   }
+
   .container {
     margin-top: 15px;
     padding: 16px;
   }
-  textarea, button, li {
+
+  textarea,
+  button,
+  li {
     font-size: 20px;
   }
 }
-
-
-
