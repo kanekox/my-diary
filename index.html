@@ -35,7 +35,7 @@
         <span id="status" role="status" aria-live="polite"></span>
       </div>
     </form>
-    <h2>日記一覧</h2>
+    <!-- h2>日記一覧</h2 -->
     <ul id="diaryList"></ul>
   </div>
 
@@ -169,7 +169,7 @@
         const data = doc.data();
         const createdAt = data.createdAt ? data.createdAt.toDate() : null;
         const dateStr = createdAt
-          ? createdAt.toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" })
+          ? `${createdAt.getFullYear()}/${createdAt.getMonth() + 1}/${createdAt.getDate()}（${["日", "月", "火", "水", "木", "金", "土"][createdAt.getDay()]}） ${createdAt.toLocaleTimeString("ja-JP", { hour12: false })}`
           : "日時不明";
 
         const li = document.createElement("li");

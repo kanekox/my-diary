@@ -92,8 +92,12 @@ body {
   display: flex;
   justify-content: center;
   /* 中央寄せ */
-  align-items: flex-start;
-  min-height: 100vh;
+  align-items: center;
+  /* Changed to center to better vertically align the fixed container */
+  height: 100vh;
+  /* Change min-height to height */
+  overflow: hidden;
+  /* Prevent body scroll */
 }
 
 /* === コンテナ（全体を中央にまとめる） === */
@@ -101,18 +105,25 @@ body {
   background: #fff;
   width: 95%;
   max-width: 600px;
-  margin-top: 30px;
+  height: 95vh;
+  /* Fixed height relative to viewport */
+  display: flex;
+  /* Flexbox for internal layout */
+  flex-direction: column;
+  /* Stack children vertically */
   padding: 20px;
   border-radius: 16px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+  /* Ensure padding doesn't affect width calculation */
 }
 
 /* === 見出し === */
 h1 {
   text-align: center;
   color: #444;
-  margin-bottom: 20px;
-  font-size: 24px;
+  margin-bottom: 10px;
+  font-size: 18px;
 }
 
 /* === 入力エリア === */
@@ -148,6 +159,13 @@ ul {
   list-style: none;
   padding: 0;
   margin: 0;
+  flex: 1;
+  /* Take remaining space */
+  overflow-y: auto;
+  /* Scrollable */
+  overflow-x: hidden;
+  /* Prevent horizontal scroll */
+  margin-top: 10px;
 }
 
 li {
