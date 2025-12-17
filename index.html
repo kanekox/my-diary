@@ -32,16 +32,35 @@
         <button id="saveBtn" type="button">保存</button>
         <button id="cancelBtn" type="button"
           style="display:none; margin-left:8px; background:#eee; color:#333;">キャンセル</button>
-        <span id="status" role="status" aria-live="polite"></span>
+
+        <div style="flex-grow: 1;"></div>
+        <input type="text" id="searchInput" placeholder="検索語句...">
+        <button id="searchBtn" type="button"><span class="material-symbols-outlined"
+            style="font-size: 18px; vertical-align: middle;">search</span></button>
       </div>
+      <p id="status" style="margin: 5px 0; min-height: 1.2em; font-size: 0.9em; color: #666;"></p>
     </form>
-    <!-- h2>日記一覧</h2 -->
+
     <ul id="diaryList"></ul>
+
+    <div id="pagination">
+      <button id="prevBtn" class="page-btn">前へ</button>
+      <span id="pageInfo">1ページ目</span>
+      <button id="nextBtn" class="page-btn">次へ</button>
+    </div>
   </div>
 
   <script type="module">
     // 編集状態管理用
     let editingId = null;
+
+    // ページネーション・検索管理用
+    let currentPage = 1;
+    const PAGE_SIZE = 20;
+    // ページごとの最後のドキュメント（カーソル）を保存
+    // pageCursors[0] は未使用, pageCursors[1] は1ページ目の最後のドキュメント
+    let pageCursors = [];
+    let isSearchMode = false;
 
     // 編集開始
     window.startEditDiary = function (id, data) {
@@ -61,6 +80,10 @@
 
     // キャンセル
     document.getElementById("cancelBtn").onclick = function () {
+      resetForm();
+    };
+
+    function resetForm() {
       editingId = null;
       document.getElementById("diaryText").value = "";
       document.querySelector('input[name="bgColor"]').checked = true;
@@ -68,13 +91,14 @@
       document.getElementById("cancelBtn").style.display = "none";
       document.getElementById("diaryLabel").textContent = "日記を入力";
       document.getElementById("status").textContent = "";
-    };
+    }
+
     // Firebase SDK 読み込み
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, orderBy }
+    import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, orderBy, limit, startAfter }
       from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-    // firebaseConfig（既存のまま）
     const firebaseConfig = {
       apiKey: "AIzaSyBGvRDZdogbWVR-Vn03lkPzLqMszX0f9eo",
       authDomain: "kanekox-apps.firebaseapp.com",
@@ -85,12 +109,8 @@
       measurementId: "G-C76YD903J2"
     };
 
-    // 初期化
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
-
-    // 日記保存
-    import { doc, updateDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     // 日記削除
     window.deleteDiary = async function (id) {
@@ -98,11 +118,21 @@
 
       try {
         await deleteDoc(doc(db, "diary", id));
-        // もし編集中の日記を削除した場合はリセット
         if (editingId === id) {
           document.getElementById("cancelBtn").click();
         }
-        await loadDiary();
+        // 削除後は現在のページをリロード（簡易対応）
+        // 項目が減ると次ページの繰り上げなどが起きるため、厳密には再取得が望ましい
+        if (isSearchMode) {
+          handleSearch(); // 再検索
+        } else {
+          // カレントページのカーソルが無効になる可能性があるので、
+          // ページ1に戻るか、現在のページを再ロード。
+          // ここでは簡易的にページ1に戻す（データ整合性のため）
+          currentPage = 1;
+          pageCursors = [];
+          await loadDiaryPage(1);
+        }
       } catch (error) {
         console.error("削除エラー:", error);
         alert("削除に失敗しました。");
@@ -125,14 +155,14 @@
         status.textContent = "保存中...";
 
         if (editingId) {
-          // 編集: updateDoc
+          // 編集
           const ref = doc(db, "diary", editingId);
           await updateDoc(ref, {
             text: text,
             color: color
           });
         } else {
-          // 新規: addDoc
+          // 新規
           await addDoc(collection(db, "diary"), {
             text: text,
             color: color,
@@ -140,89 +170,225 @@
           });
         }
 
-        // フォームリセット
-        editingId = null;
-        document.getElementById("diaryText").value = "";
-        document.querySelector('input[name="bgColor"]').checked = true;
-        document.getElementById("saveBtn").textContent = "保存";
-        document.getElementById("cancelBtn").style.display = "none";
-        document.getElementById("diaryLabel").textContent = "日記を入力";
-        status.textContent = "";
-        await loadDiary();
+        resetForm();
+        status.textContent = "保存しました";
+
+        // 保存後は検索モードを解除して最新を表示
+        isSearchMode = false;
+        document.getElementById("searchInput").value = "";
+        currentPage = 1;
+        pageCursors = [];
+        await loadDiaryPage(1);
+
       } catch (error) {
-        status.textContent = "保存に失敗しました。もう一度お試しください。";
+        status.textContent = "保存に失敗しました。";
         console.error("保存エラー:", error);
       } finally {
         saveBtn.disabled = false;
       }
     }
 
-    // 日記一覧取得
-    async function loadDiary() {
+    // 日記一覧表示（共通処理）
+    function renderList(docsData) {
       const diaryList = document.getElementById("diaryList");
       diaryList.innerHTML = "";
 
-      const q = query(collection(db, "diary"), orderBy("createdAt", "desc"));
-      const querySnapshot = await getDocs(q);
+      if (docsData.length === 0) {
+        diaryList.innerHTML = '<li style="text-align:center; background:none; box-shadow:none;">表示する日記がありません</li>';
+        return;
+      }
 
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
+      docsData.forEach(item => {
+        const { id, data } = item;
         const createdAt = data.createdAt ? data.createdAt.toDate() : null;
         const dateStr = createdAt
           ? `${createdAt.getFullYear()}/${createdAt.getMonth() + 1}/${createdAt.getDate()}（${["日", "月", "火", "水", "木", "金", "土"][createdAt.getDay()]}） ${createdAt.toLocaleTimeString("ja-JP", { hour12: false })}`
           : "日時不明";
 
         const li = document.createElement("li");
-        li.dataset.id = doc.id;
-        const dateEl = document.createElement("div");
-        const textEl = document.createElement("div");
+        li.dataset.id = id;
 
-        dateEl.textContent = dateStr;
-        textEl.textContent = data.text;
-
-        dateEl.classList.add("date");
-        textEl.classList.add("text");
-
-        // 背景色を反映（デフォルトは#f8f9fa）
+        // 背景色
         li.style.background = data.color || "#f8f9fa";
-        li.style.margin = "12px 0";
-        li.style.borderRadius = "8px";
-        li.style.padding = "8px 12px";
-        li.style.listStyle = "none";
 
-        // 編集ボタン（日時の下に小さく表示）
-        const editBtn = document.createElement("button");
-        editBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">edit</span>';
-        editBtn.title = "編集";
-        editBtn.type = "button";
-        editBtn.className = "edit-btn";
-        editBtn.onclick = () => startEditDiary(doc.id, data);
+        // Inner HTML Construction
+        const html = `
+          <div class="date-edit-wrap">
+            <div class="date">${dateStr}</div>
+            <button type="button" class="edit-btn" onclick="startEditDiary('${id}', {text: '${data.text.replace(/'/g, "&apos;").replace(/\n/g, "\\n")}', color: '${data.color}'})"><span class="material-symbols-outlined" style="font-size:16px;">edit</span></button>
+            <button type="button" class="delete-btn" onclick="deleteDiary('${id}')"><span class="material-symbols-outlined" style="font-size:16px;">delete</span></button>
+          </div>
+          <div class="text">${data.text}</div>
+        `;
+        li.innerHTML = html;
 
-        // 削除ボタン
-        const deleteBtn = document.createElement("button");
-        deleteBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">delete</span>';
-        deleteBtn.title = "削除";
-        deleteBtn.type = "button";
-        deleteBtn.className = "delete-btn";
-        deleteBtn.onclick = () => deleteDiary(doc.id);
+        // 編集ボタンのonclickでオブジェクトを渡すのはエスケープが面倒なので、
+        // onclickイベントをJSで設定し直すアプローチもあるが、ここでは修正してデータ属性などは使わずクロージャで渡すにはforEach内で構築するのが楽。
+        // 上記のinnerHTMLアプローチだとonclick内のデータ渡しが壊れやすいので、createElementで再構成します。
 
-        // 日時と編集ボタンを右詰め横並び
+        li.innerHTML = ""; // Clear
+
         const dateWrap = document.createElement("div");
         dateWrap.className = "date-edit-wrap";
+
+        const dateEl = document.createElement("div");
+        dateEl.className = "date";
+        dateEl.textContent = dateStr;
+
+        const editBtn = document.createElement("button");
+        editBtn.className = "edit-btn";
+        editBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">edit</span>';
+        editBtn.onclick = () => startEditDiary(id, data);
+
+        const delBtn = document.createElement("button");
+        delBtn.className = "delete-btn";
+        delBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:16px;">delete</span>';
+        delBtn.onclick = () => deleteDiary(id);
+
         dateWrap.appendChild(dateEl);
         dateWrap.appendChild(editBtn);
-        dateWrap.appendChild(deleteBtn);
+        dateWrap.appendChild(delBtn);
+
+        const textEl = document.createElement("div");
+        textEl.className = "text";
+        textEl.textContent = data.text;
+
         li.appendChild(dateWrap);
         li.appendChild(textEl);
+
         diaryList.appendChild(li);
       });
     }
 
-    // 初期化: ボタンイベント登録と一覧読み込み
+    // ページ読み込み関数
+    async function loadDiaryPage(page) {
+      if (isSearchMode) return; // 検索モード中はページネーション処理をしない（あるいは検索結果用のページネーションにする）
+
+      const diaryList = document.getElementById("diaryList");
+      diaryList.style.opacity = "0.5"; // ロード中感
+
+      try {
+        let q;
+        if (page === 1) {
+          q = query(collection(db, "diary"), orderBy("createdAt", "desc"), limit(PAGE_SIZE));
+        } else {
+          // 前のページの最後のドキュメントを取得
+          const prevCursor = pageCursors[page - 1];
+          if (!prevCursor) {
+            // カーソルがない場合はページ1に戻す
+            currentPage = 1;
+            return loadDiaryPage(1);
+          }
+          q = query(collection(db, "diary"), orderBy("createdAt", "desc"), startAfter(prevCursor), limit(PAGE_SIZE));
+        }
+
+        const querySnapshot = await getDocs(q);
+
+        const items = [];
+        querySnapshot.forEach(doc => {
+          items.push({ id: doc.id, data: doc.data() });
+        });
+
+        renderList(items);
+
+        // カーソル保存（現在のページの最後のドキュメント）
+        if (querySnapshot.docs.length > 0) {
+          pageCursors[page] = querySnapshot.docs[querySnapshot.docs.length - 1];
+        }
+
+        // UI更新
+        document.getElementById("pageInfo").textContent = `${page}ページ目`;
+        document.getElementById("prevBtn").disabled = (page === 1);
+        // 次のページがあるかどうかは、取得数がPAGE_SIZEと同じかどうかで推測
+        document.getElementById("nextBtn").disabled = (querySnapshot.docs.length < PAGE_SIZE);
+
+        // ページネーション表示
+        document.getElementById("pagination").style.display = "flex";
+
+      } catch (e) {
+        console.error("Load Error", e);
+        document.getElementById("status").textContent = "読み込みエラー";
+      } finally {
+        diaryList.style.opacity = "1";
+      }
+    }
+
+    // 検索機能
+    async function handleSearch() {
+      const term = document.getElementById("searchInput").value.trim();
+      if (!term) {
+        // 空の場合は検索モード解除してリセット
+        isSearchMode = false;
+        currentPage = 1;
+        pageCursors = [];
+        document.getElementById("status").textContent = "";
+        loadDiaryPage(1);
+        return;
+      }
+
+      isSearchMode = true;
+      document.getElementById("pagination").style.display = "none"; // 検索結果はページネーションなし（全件表示）
+      document.getElementById("status").textContent = "検索中...";
+
+      const diaryList = document.getElementById("diaryList");
+      diaryList.style.opacity = "0.5";
+
+      try {
+        // 検索時は全件取得してJSでフィルタリング（Firestoreの制約のため）
+        // 記事数が数千件になるとパフォーマンスに影響が出る可能性があります
+        const q = query(collection(db, "diary"), orderBy("createdAt", "desc"));
+        const snapshot = await getDocs(q);
+
+        const results = [];
+        snapshot.forEach(doc => {
+          const d = doc.data();
+          if (d.text && d.text.includes(term)) {
+            results.push({ id: doc.id, data: d });
+          }
+        });
+
+        renderList(results);
+        document.getElementById("status").textContent = `${results.length}件見つかりました`;
+
+      } catch (e) {
+        console.error("Search Error", e);
+        document.getElementById("status").textContent = "検索エラー";
+      } finally {
+        diaryList.style.opacity = "1";
+      }
+    }
+
+    // イベント設定
     window.addEventListener('DOMContentLoaded', () => {
-      const btn = document.getElementById("saveBtn");
-      if (btn) btn.addEventListener("click", saveDiary);
-      loadDiary();
+      const saveBtn = document.getElementById("saveBtn");
+      if (saveBtn) saveBtn.addEventListener("click", saveDiary);
+
+      const searchBtn = document.getElementById("searchBtn");
+      if (searchBtn) searchBtn.addEventListener("click", handleSearch);
+
+      // Enterキーで検索
+      document.getElementById("searchInput").addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault(); // Form submit防止
+          handleSearch();
+        }
+      });
+
+      // ページネーション
+      document.getElementById("prevBtn").addEventListener("click", () => {
+        if (currentPage > 1) {
+          currentPage--;
+          loadDiaryPage(currentPage);
+        }
+      });
+
+      document.getElementById("nextBtn").addEventListener("click", () => {
+        currentPage++;
+        loadDiaryPage(currentPage);
+      });
+
+      // 初期ロード
+      loadDiaryPage(1);
     });
   </script>
 </body>
